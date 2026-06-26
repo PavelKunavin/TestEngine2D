@@ -1,0 +1,21 @@
+{
+    "configurations": [
+        {
+            "name": "TestEngine 2D",
+            "includePath": [
+                "${workspaceFolder}/engine2d",
+                "${workspaceFolder}/vendor/glfw/include",
+                "${workspaceFolder}/vendor/glad/include",
+                "${workspaceFolder}/vendor/imgui",
+                "${workspaceFolder}/vendor/imgui/backends",
+                "${workspaceFolder}/vendor/stb"
+            ],
+            "defines": [],
+            "compilerPath": "clang++",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "clang-x64"
+        }
+    ],
+    "version": 4
+}

@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug TestEngine2D",
+            "program": "${workspaceFolder}/build/2DGame.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "build 2D",
+            "sourceMap": {
+                "/proc/self/cwd": "${workspaceFolder}"
+            }
+        }
+    ]
+}
