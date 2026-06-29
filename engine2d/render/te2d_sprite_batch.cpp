@@ -1,51 +1,55 @@
 #include <render/te2d_sprite_batch.hpp>
 #include <glad/glad.h>
+#include <cmath>
 #include <cstring>
 
 static constexpr u32 VERTICES_PER_SPRITE = 4;
 static constexpr u32 INDICES_PER_SPRITE  = 6;
-static constexpr u32 MAX_VERTICES = TE2D_MAX_SPRITES * VERTICES_PER_SPRITE;
-static constexpr u32 MAX_INDICES  = TE2D_MAX_SPRITES * INDICES_PER_SPRITE;
 
-static te2d_sprite_batch::vertex vertex_buffer[MAX_VERTICES];
-static u32 vertex_buffer_count = 0;
+te2d_sprite_batch te2d_sprite_batch::create(te2d_allocator& allocator) {
+    te2d_sprite_batch batch = {};
 
-static u32 index_buffer[MAX_INDICES];
+    u32 max_vertices = TE2D_MAX_SPRITES * VERTICES_PER_SPRITE;
+    u32 max_indices  = TE2D_MAX_SPRITES * INDICES_PER_SPRITE;
 
-static void init_indices() {
-    static bool done = false;
-    if (done) return;
-    done = true;
+    // Выделяем буферы в аллокаторе
+    batch.vertex_buffer = allocator.alloc_type<vertex>(max_vertices);
+    batch.index_buffer  = allocator.alloc_type<u32>(max_indices);
+    batch.max_vertices  = max_vertices;
 
+    if (!batch.vertex_buffer || !batch.index_buffer) {
+        return batch; // не хватило памяти
+    }
+
+    // Индексы — генерируем один раз, они не меняются
     for (u32 i = 0; i < TE2D_MAX_SPRITES; ++i) {
-        u32 v = i * VERTICES_PER_SPRITE;
+        u32 v   = i * VERTICES_PER_SPRITE;
         u32 idx = i * INDICES_PER_SPRITE;
 
-        index_buffer[idx + 0] = v + 0;
-        index_buffer[idx + 1] = v + 1;
-        index_buffer[idx + 2] = v + 2;
-        index_buffer[idx + 3] = v + 0;
-        index_buffer[idx + 4] = v + 2;
-        index_buffer[idx + 5] = v + 3;
+        batch.index_buffer[idx + 0] = v + 0;
+        batch.index_buffer[idx + 1] = v + 1;
+        batch.index_buffer[idx + 2] = v + 2;
+        batch.index_buffer[idx + 3] = v + 0;
+        batch.index_buffer[idx + 4] = v + 2;
+        batch.index_buffer[idx + 5] = v + 3;
     }
-}
 
-te2d_sprite_batch te2d_sprite_batch::create() {
-    te2d_sprite_batch batch = {};
-    init_indices();
-
+    // VAO
     glGenVertexArrays(1, &batch.vao);
     glBindVertexArray(batch.vao);
 
+    // VBO (dynamic)
     glGenBuffers(1, &batch.vbo);
     glBindBuffer(GL_ARRAY_BUFFER, batch.vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_buffer), nullptr, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, max_vertices * sizeof(vertex), nullptr, GL_DYNAMIC_DRAW);
 
+    // EBO (static)
     GLuint ebo;
     glGenBuffers(1, &ebo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_buffer), index_buffer, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, max_indices * sizeof(u32), batch.index_buffer, GL_STATIC_DRAW);
 
+    // Атрибуты
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*)0);
     glEnableVertexAttribArray(0);
 
@@ -53,6 +57,7 @@ te2d_sprite_batch te2d_sprite_batch::create() {
     glEnableVertexAttribArray(1);
 
     glBindVertexArray(0);
+
     return batch;
 }
 
@@ -70,7 +75,6 @@ void te2d_sprite_batch::begin() {
 void te2d_sprite_batch::draw(const te2d_sprite& sprite) {
     if (!sprite.visible || !sprite.texture || !sprite.texture->id) return;
 
-    // Если текстура сменилась — сбрасываем батч
     if (sprite_count > 0 && sprite.texture->id != current_texture_id) {
         flush();
     }
@@ -93,7 +97,6 @@ void te2d_sprite_batch::draw(const te2d_sprite& sprite) {
 
     f32 tw = (f32)sprite.texture->width;
     f32 th = (f32)sprite.texture->height;
-
     f32 u0 = sprite.uv_region.x / tw;
     f32 v0 = (sprite.uv_region.y + rh) / th;
     f32 u1 = (sprite.uv_region.x + rw) / tw;
@@ -121,37 +124,29 @@ void te2d_sprite_batch::draw(const te2d_sprite& sprite) {
 
     vertex* v = &vertex_buffer[vertex_buffer_count];
 
-    // v0: левый верх
     {
-        f32 lx = left;
-        f32 ly = top;
+        f32 lx = left;  f32 ly = top;
         v[0].x = px + lx * cos_r - ly * sin_r;
         v[0].y = py + lx * sin_r + ly * cos_r;
         v[0].u = u0; v[0].v = v0;
         v[0].r = cr; v[0].g = cg; v[0].b = cb; v[0].a = ca;
     }
-    // v1: правый верх
     {
-        f32 lx = right;
-        f32 ly = top;
+        f32 lx = right; f32 ly = top;
         v[1].x = px + lx * cos_r - ly * sin_r;
         v[1].y = py + lx * sin_r + ly * cos_r;
         v[1].u = u1; v[1].v = v0;
         v[1].r = cr; v[1].g = cg; v[1].b = cb; v[1].a = ca;
     }
-    // v2: правый низ
     {
-        f32 lx = right;
-        f32 ly = bottom;
+        f32 lx = right; f32 ly = bottom;
         v[2].x = px + lx * cos_r - ly * sin_r;
         v[2].y = py + lx * sin_r + ly * cos_r;
         v[2].u = u1; v[2].v = v1;
         v[2].r = cr; v[2].g = cg; v[2].b = cb; v[2].a = ca;
     }
-    // v3: левый низ
     {
-        f32 lx = left;
-        f32 ly = bottom;
+        f32 lx = left;  f32 ly = bottom;
         v[3].x = px + lx * cos_r - ly * sin_r;
         v[3].y = py + lx * sin_r + ly * cos_r;
         v[3].u = u0; v[3].v = v1;
@@ -173,7 +168,6 @@ void te2d_sprite_batch::flush() {
 
     upload();
 
-    // Биндим текстуру текущего батча
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, current_texture_id);
 
