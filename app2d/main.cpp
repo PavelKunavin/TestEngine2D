@@ -4,6 +4,7 @@
 #include <GLFW/glfw3.h>
 
 #include <core/te2d_log.hpp>
+#include <core/te2d_allocator.hpp>
 #include <render/te2d_render_frontend.hpp>
 #include <render/te2d_texture.hpp>
 #include <render/te2d_sprite.hpp>
@@ -34,6 +35,7 @@ static te2d_camera g_camera;
 static f32         g_camera_speed = 300.0f;
 
 // Физика
+static te2d_allocator     g_physics_allocator;
 static te2d_physics_world g_world;
 static i32                g_player_body_index   = -1;
 static i32                g_platform_body_index = -1;
@@ -45,6 +47,9 @@ static f32                g_move_speed          = 200.0f;
 
 static void game_init() {
     TE2D_INFO("APP", "Game init...");
+
+    // Аллокатор для физического мира
+    g_physics_allocator = te2d_allocator::create(1024 * 1024); // 1 MB
 
     // Текстура и спрайт персонажа
     g_player_tex = te2d_texture::load("assets2d/textures/player.png");
@@ -61,7 +66,7 @@ static void game_init() {
     g_camera.position = {640.0f, 360.0f};
 
     // Физический мир
-    g_world = te2d_physics_world::create();
+    g_world = te2d_physics_world::create(g_physics_allocator);
 
     // Персонаж (динамическое тело + AABB)
     {
@@ -88,6 +93,7 @@ static void game_init() {
 static void game_shutdown() {
     g_player_tex.unload();
     g_platform_tex.unload();
+    g_physics_allocator.destroy();
     TE2D_INFO("APP", "Game shutdown OK");
 }
 
@@ -128,7 +134,7 @@ static void game_update(f32 dt) {
 static void game_draw() {
     te2d_render_begin_frame(g_camera);
 
-    te2d_render_draw_sprite(g_platform_sprite); // платформа под персонажем
+    te2d_render_draw_sprite(g_platform_sprite);
     te2d_render_draw_sprite(g_player_sprite);
 
     // -------------------------------
